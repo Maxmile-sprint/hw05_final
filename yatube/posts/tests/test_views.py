@@ -100,8 +100,6 @@ class PostViewsTests(TestCase):
         cls.user = User.objects.create_user(username='auth')
         cls.follower_user = User.objects.create_user(
             username='follower')
-        cls.unfollower_user = User.objects.create_user(
-            username='unfollower')
         cls.group = Group.objects.create(
             title='Тестовая группа',
             slug='test-slug',
@@ -140,9 +138,6 @@ class PostViewsTests(TestCase):
         self.follower_authorized_client = Client()
         self.follower_authorized_client.force_login(
             PostViewsTests.follower_user)
-        self.unfollower_authorized_client = Client()
-        self.unfollower_authorized_client.force_login(
-            PostViewsTests.unfollower_user)
 
     def test_pages_uses_correct_template(self):
         """View-функция использует соответствубщий шаблон"""
@@ -341,10 +336,10 @@ class PostViewsTests(TestCase):
                 'после удаления поста и после очистки кеша не должны быть '
                 'равны друг другу'))
 
-    def test_creat_and_delete_follow_row_authorized_client(self):
+    def test_create_follow_row_authorized_client(self):
         """
         Проверка возможности авторизованного пользователя
-        подписываться на других пользователей и удалять их из подписок.
+        подписываться на других пользователей.
         """
         post = PostViewsTests.post
 
@@ -363,16 +358,28 @@ class PostViewsTests(TestCase):
         self.assertEqual(Follow.objects.count(), follows_count + 1, (
             'Ошибка. Количество подписок не увеличилось'))
 
-        self.follower_authorized_client.get(reverse(
-            'posts:profile_unfollow', kwargs={'username': f'{post.author}'}))
+    def test_delete_follow_row_authorized_client(self):
+        """
+        Проверка возможности авторизованного пользователя
+        отписываться от других пользователей.
+        """
+        Follow.objects.get_or_create(
+            user=PostViewsTests.follower_user,
+            author=PostViewsTests.user
+        )
+        follows_count = Follow.objects.count()
 
-        self.assertEqual(Follow.objects.count(), follows_count, (
+        self.follower_authorized_client.get(reverse(
+            'posts:profile_unfollow', kwargs={
+                'username': f'{PostViewsTests.user}'}))
+
+        self.assertEqual(Follow.objects.count(), follows_count - 1, (
             'Ошибка. Количество подписок не уменьшилось'))
 
-    def test_new_post_in_followers_feeds_and_not_in_unfollowers_feeds(self):
+    def test_new_post_in_followers_feeds(self):
         """
         Новая запись пользователя появляется в ленте тех,
-        кто на него подписан и не появляется в ленте тех, кто не подписан.
+        кто на него подписан.
         """
         user = PostViewsTests.user
 
@@ -384,24 +391,36 @@ class PostViewsTests(TestCase):
             group=PostViewsTests.group,
             text='Тестирование подписки'
         )
-        response1 = self.follower_authorized_client.get(
-            reverse('posts:follow_index'))
-        response2 = self.unfollower_authorized_client.get(
+        response = self.follower_authorized_client.get(
             reverse('posts:follow_index'))
 
-        page_obj_first = response1.context['page_obj']
-        page_obj_second = response2.context['page_obj']
+        page_obj = response.context['page_obj']
 
-        self.assertIn(self.new_post, page_obj_first, (
+        self.assertIn(self.new_post, page_obj, (
             f'Ошибка. Новый пост автора отсутствует в ленте новых записей '
             f'подписчика {PostViewsTests.follower_user}'))
-        self.assertEqual(page_obj_first[0].text, self.new_post.text, (
+        self.assertEqual(page_obj[0].text, self.new_post.text, (
             'Ошибка. Неверный контекст (поле text)'))
-        self.assertEqual(page_obj_first[0].group, self.new_post.group, (
+        self.assertEqual(page_obj[0].group, self.new_post.group, (
             'Ошибка. Неверный контекст (поле group)'))
-        self.assertEqual(page_obj_first[0].author, self.new_post.author, (
+        self.assertEqual(page_obj[0].author, self.new_post.author, (
             'Ошибка. Неверный контекст (поле author)'))
 
-        self.assertNotIn(self.new_post, page_obj_second, (
+    def test_new_post_not_in_unfollowers_feeds(self):
+        """
+        Новая запись пользователя не появляется в ленте тех,
+        кто на него не подписан.
+        """
+        self.new_post = Post.objects.create(
+            author=PostViewsTests.user,
+            group=PostViewsTests.group,
+            text='Тестирование подписки'
+        )
+        response = self.follower_authorized_client.get(
+            reverse('posts:follow_index'))
+
+        page_obj = response.context['page_obj']
+
+        self.assertNotIn(self.new_post, page_obj, (
             f'Ошибка. Новый пост автора не должен отображается в ленте новых '
-            f'записей неподписчика {PostViewsTests.unfollower_user}'))
+            f'записей неподписчика {PostViewsTests.follower_user}'))

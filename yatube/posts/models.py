@@ -20,20 +20,27 @@ class Post(CreatedModel):
 
     SYMBOLS_LIMIT = 15
 
-    text = models.TextField(verbose_name='Текст поста',)
+    text = models.TextField(
+        verbose_name='Текст поста',
+        help_text='Текст нового поста',
+    )
     author = models.ForeignKey(
         User,
         verbose_name='Автор',
         on_delete=models.CASCADE,
-        related_name='posts_usr')
+        related_name='posts_usr'
+    )
     group = models.ForeignKey(
         Group,
         verbose_name='Группа по интересам',
+        help_text='Группа, к которой будет относиться пост',
         on_delete=models.SET_NULL,
         blank=True, null=True,
-        related_name='posts_grp',)
+        related_name='posts_grp',
+    )
     image = models.ImageField(
         verbose_name='Картинка',
+        help_text='Загрузите картинку',
         upload_to='posts/',
         blank=True,)
 
@@ -47,6 +54,9 @@ class Post(CreatedModel):
 
 
 class Comment(CreatedModel):
+
+    SYMBOLS_LIMIT = 50
+
     post = models.ForeignKey(
         Post,
         related_name='comments',
@@ -63,7 +73,7 @@ class Comment(CreatedModel):
         verbose_name_plural = 'Комметарии'
 
     def __str__(self):
-        return self.text[:50]
+        return self.text[:self.SYMBOLS_LIMIT]
 
 
 class Follow(models.Model):
@@ -83,3 +93,7 @@ class Follow(models.Model):
     class Meta:
         verbose_name = 'Подписка'
         verbose_name_plural = 'Подписки'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'author'], name='follow_row')
+        ]

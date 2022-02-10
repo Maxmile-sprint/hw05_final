@@ -70,6 +70,7 @@
               <a href="{% url 'posts:profile' comment.author.username %}">
                 {{ comment.author.username }}
               </a>
+              <small>{{ comment.created }}</small>
             </h5>
             <p>
             {{ comment.text }}

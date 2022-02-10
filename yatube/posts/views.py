@@ -39,10 +39,8 @@ def profile(request, username):
 
     page_obj = get_page_obj(author.posts_usr.all(), request)
 
-    if request.user.is_authenticated:
-        following = Follow.objects.filter(user=request.user, author=author)
-    else:
-        following = None
+    following = request.user.is_authenticated and Follow.objects.filter(
+        user=request.user, author=author).exists()
 
     context = {
         'page_obj': page_obj,
@@ -132,7 +130,7 @@ def post_edit(request, post_id):
 
 @login_required
 def add_comment(request, post_id):
-    post = Post.objects.get(pk=post_id)
+    post = get_object_or_404(Post, pk=post_id)
     form = CommentForm(request.POST or None)
     if form.is_valid():
         comment = form.save(commit=False)
@@ -144,7 +142,7 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    current_user = get_object_or_404(User, username=request.user.username)
+    current_user = request.user
 
     authors = list(current_user.follower.values_list('author', flat=True))
 
@@ -170,6 +168,5 @@ def profile_follow(request, username):
 def profile_unfollow(request, username):
     user = request.user
     author = get_object_or_404(User, username=username)
-    if user != author:
-        Follow.objects.get(user=user, author=author).delete()
+    Follow.objects.get(user=user, author=author).delete()
     return redirect('posts:profile', username=username)
